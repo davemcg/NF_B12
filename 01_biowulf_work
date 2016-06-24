@@ -1,0 +1,6 @@
+# move lane bams from trek to biowulf2:/data/mcgaugheyd/projects/nhgri/brody/NF_B12_mouse
+rsync -rav trek.nhgri.nih.gov:/cluster/ifs/projects/solexa/reads/160614_YOSHI_C90KTANXX/ .
+# then I later realized I pulled lane bams from an entire machine run. Oops.
+# so I had to hand keep the files for this project: matrix.txt
+
+# now need 
