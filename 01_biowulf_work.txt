@@ -3,9 +3,15 @@ rsync -rav trek.nhgri.nih.gov:/cluster/ifs/projects/solexa/reads/160614_YOSHI_C9
 # then I later realized I pulled lane bams from an entire machine run. Oops.
 # so I had to hand keep the files for this project: matrix.txt
 
+# qorts qc
+~/git/NF_12/./qorts_run.sh
+
 # now need to shuffle the bam files and extract fastq
 swarm -f ~/git/NF_12/bam2fq.swarm --module samtools --partition=quick
 
-# next is to align with STAR 
+# then gzip
+swarm -f ~/git/NF_12/gzip_fq.swarm --partition-quick
 
-# test align with kallisto to do a rough comparison
+# next is to align with kallisto
+~/git/NF_12/./kallisto_sbatch.sh 
+
