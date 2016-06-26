@@ -1,5 +1,5 @@
 #!/bin/bash
-# kallist_quant.sh git 7a92496..7dcadf4 
+# kallist_quant.sh git commit 7dcadf4  
 sbatch --partition=quick --cpus-per-task 8 /home/mcgaugheyd/bin/kallisto_quant.sh mouse 160614_YOSHI_C90KTANXX.2.12581558_1.fq.gz 160614_YOSHI_C90KTANXX.2.12581558_2.fq.gz
 sbatch --partition=quick --cpus-per-task 8 /home/mcgaugheyd/bin/kallisto_quant.sh mouse 160614_YOSHI_C90KTANXX.2.12581559_1.fq.gz 160614_YOSHI_C90KTANXX.2.12581559_2.fq.gz
 sbatch --partition=quick --cpus-per-task 8 /home/mcgaugheyd/bin/kallisto_quant.sh mouse 160614_YOSHI_C90KTANXX.2.12581560_1.fq.gz 160614_YOSHI_C90KTANXX.2.12581560_2.fq.gz
