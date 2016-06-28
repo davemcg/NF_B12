@@ -1,17 +1,32 @@
-# move lane bams from trek to biowulf2:/data/mcgaugheyd/projects/nhgri/brody/NF_B12_mouse
+#1 move lane bams from trek to biowulf2:/data/mcgaugheyd/projects/nhgri/brody/NF_B12_mouse
 rsync -rav trek.nhgri.nih.gov:/cluster/ifs/projects/solexa/reads/160614_YOSHI_C90KTANXX/ .
 # then I later realized I pulled lane bams from an entire machine run. Oops.
-# so I had to hand keep the files for this project: matrix.txt
+# so I had to hand retain the files for this project: matrix.txt
 
-# qorts qc
-~/git/NF_12/./qorts_run.sh
+#2 now need to shuffle the bam files and extract fastq
+swarm -f ~/git/NF_B12/bam2fq.swarm --module samtools --partition=quick
 
-# now need to shuffle the bam files and extract fastq
-swarm -f ~/git/NF_12/bam2fq.swarm --module samtools --partition=quick
-
-# then gzip
-swarm -f ~/git/NF_12/gzip_fq.swarm --partition-quick
+#3 then gzip
+swarm -f ~/git/NF_B12/gzip_fq.swarm --partition-quick
 
 # next is to align with kallisto
-~/git/NF_12/./kallisto_sbatch.sh 
+# "reference free alignment"
+# but requires gene info
+~/git/NF_B12/./kallisto_sbatch.sh 
+
+# then align with STAR
+# the "old school" approach, not sure if going with this or using kallisto for quantification
+# plus qorts quantificatino is unhappy with the NISC bams
+~/git/NF_B12/./star_run.sh
+
+####
+# kallisto and star scripts cannot be run directly since I do not retain the NISC lane bams and the associated fastq files, as this is a poor use of disk space 
+# scripts provided to provide information on version numbers and to make it straightforward to re-run (should you do #1, #2, and #3)
+####
+
+# qorts for QC
+# run in STAR_bams folder
+# /data/mcgaugheyd/projects/nhgri/brody/NF_B12_mouse/STAR_bams
+~/git/NF_B12/./qorts_run.sh
+
 
