@@ -9,7 +9,7 @@ library(dplyr)
 
 # grab all kallisto quantification files
 # currently technical replicates are separate
-files <- paste(list.files(path='/Volumes/ThunderBay/PROJECTS/brody/NF_B12_mouse/kallisto/', pattern=".*.*_kallisto", full.names=TRUE, include.dirs=TRUE, recursive=TRUE), '/abundance.tsv', sep='')
+files <- paste(list.files(path='/Volumes/ThunderBay/PROJECTS/brody/NF_B12_mouse/kallisto', pattern=".*.*_kallisto", full.names=TRUE, include.dirs=TRUE, recursive=TRUE), '/abundance.tsv', sep='')
 
 # annotation info to jump from transcript to gene
 # kallisto quantifies on the transcript level, but it is much 
@@ -18,6 +18,7 @@ files <- paste(list.files(path='/Volumes/ThunderBay/PROJECTS/brody/NF_B12_mouse/
 # to grab the gene name
 anno <- fread(files[1]) # any file will work
 anno$Gene <- sapply(anno$target_id,function(x) strsplit(x,'\\|')[[1]][6])
+anno <- data.frame(anno)
 
 # actually merge tx specific counts to gene level
 txi <- tximport(files, type = "kallisto", tx2gene = anno, reader = read_tsv, countsFromAbundance = c("lengthScaledTPM"))
