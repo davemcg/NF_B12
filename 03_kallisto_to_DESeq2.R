@@ -19,6 +19,7 @@ files <- paste(list.files(path='/Volumes/ThunderBay/PROJECTS/brody/NF_B12_mouse/
 anno <- fread(files[1]) # any file will work
 anno$Gene <- sapply(anno$target_id,function(x) strsplit(x,'\\|')[[1]][6])
 anno <- data.frame(anno)
+anno <- anno %>% select(target_id, Gene)
 
 # actually merge tx specific counts to gene level
 txi <- tximport(files, type = "kallisto", tx2gene = anno, reader = read_tsv, countsFromAbundance = c("lengthScaledTPM"))
