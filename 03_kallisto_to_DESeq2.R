@@ -26,14 +26,14 @@ txi <- tximport(files, type = "kallisto", tx2gene = anno, reader = read_tsv, cou
 TPM <- data.frame(txi$counts)
 
 # name again with folder names
-names <- sapply(files, function(x) strsplit(x,"\\/|_kallisto")[[1]][9])
+names <- sapply(files, function(x) strsplit(x,"\\/|_kallisto")[[1]][8])
 colnames(TPM) <- names
 
 ######
 # quick side-step into clustering with t-sne
 library(ggrepel)
 library(Rtsne)
-tsne_out <- Rtsne(as.matrix(log2(t(TPM)+1)),perplexity = 7)
+tsne_out <- Rtsne(as.matrix(log2(t(TPM)+1)),perplexity = 15)
 tsne_plot <- data.frame(tsne_out$Y)
 tsne_plot$Run <- colnames(TPM)
 
