@@ -1,4 +1,4 @@
-source('~/git/NF_B12/03_kallisto_to_DESeq2.R')
+source('~/git/NF_B12/02_kallisto_to_DESeq2.R')
 
 library(IHW)
 library(fdrtool)
@@ -9,7 +9,9 @@ ddsCollD <- collapseReplicates(ddsD, ddsD$sample.ID, ddsD$unique.ID)
 ddsCollMF <- collapseReplicates(ddsMF, ddsMF$sample.ID, ddsMF$unique.ID)
 
 process <- function(dds,contrast, design){
-  DESeq2Table <- DESeq(dds)
+  DESeq2Table <- DESeq(dds,betaPrior = FALSE)
+    unadjData <- data.frame(results(DESeq2Table, contrast=contrast,design = ~ design,filterFun=ihw))
+    unadjData <- unadjData %>% mutate(Gene=row.names(unadjData), log2FoldChangeUncorrected=log2FoldChange)
   DESeq2Table <- estimateDispersions(DESeq2Table)
   DESeq2Table <-  nbinomWaldTest(DESeq2Table)
   DESeq2Res <- results(DESeq2Table, contrast=contrast,design = ~ design,filterFun=ihw)
@@ -45,6 +47,8 @@ process <- function(dds,contrast, design){
   # merge together
   out <- merge(stats,gene_counts,by="row.names")
   colnames(out)[1] <- 'Gene'
+  # add log2FoldChange from betaPrior=FALSE run
+  out <- merge(out,unadjData[,c("Gene","log2FoldChangeUncorrected")],by="Gene")
   return(out)
 }
 
@@ -65,7 +69,7 @@ renamer <- function(input) {
   colnames(input)[grep('B12',colnames(input))] <- 
   SampleTable %>% dplyr::select(sample.ID,Genotype,Diet) %>% distinct() %>% mutate(ID=paste(Genotype,Diet,sample.ID,sep='.')) %>% arrange(sample.ID) %>% .[['ID']]
   ordered_names <- SampleTable %>% dplyr::select(sample.ID,Genotype,Diet) %>% distinct() %>% mutate(ID=paste(Genotype,Diet,sample.ID,sep='.')) %>% arrange(ID) %>% .[['ID']]
-  ordered_names <- c('Gene','Source','Chr','Start','End','baseMean','log2FoldChange','lfcSE','stat','pvalue','weight','padj',ordered_names)
+  ordered_names <- c('Gene','Source','Chr','Start','End','baseMean','log2FoldChange','log2FoldChangeUncorrected','lfcSE','stat','pvalue','weight','padj',ordered_names)
   input %>% dplyr::select_(.dots=ordered_names)
 }
 cd320.ko_vs_ctrl <- renamer(cd320.ko_vs_ctrl)
@@ -74,4 +78,5 @@ cd320.koB12neg_vs_ctrlB12pos <- renamer(cd320.koB12neg_vs_ctrlB12pos)
 cd320.koB12neg_vs_ctrlB12neg <- renamer(cd320.koB12neg_vs_ctrlB12neg)
 
 # make volcano plots
+source('volcano_plot.R')
 
