@@ -23,5 +23,5 @@ colnames(gtf_core) <- c("Chr","Start","End", "Source","Gene_Name","Gene_ID")
 # edit to match whatever comparison you are doing
 gtf_merge <- function(input){
   out <- merge(input,gtf_core,by.x="Gene",by.y="Gene_Name")
-  out %>% dplyr::select(Gene, Source, Chr, Start, End, baseMean:B12_16)
+  out %>% dplyr::select(Gene, Source, Chr, Start, End, baseMean:log2FoldChange, log2FoldChangeUncorrected, lfcSE:B12_16)
 }
