@@ -1,0 +1,192 @@
+---
+title: "NF_B12 Analysis 1"
+author: "David McGaughey"
+date: "August 3, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+```
+
+# Project: Mouse CD320 KO with B12+/- Chow. Brain RNA-Seq.
+
+
+## Introduction
+Mouse work done 97% by David Bernard. PI Lawrence Brody. CD320 (transcobamin receptr) knockout (KO) by DB, and subjected to a large set of experiments trying to suss out whether B12 transport has been affected. Since the full KO were largely healthy, DB gave the mice (and normal mice from the same background) special mouse chow that was B12 deficient and B12 positive ('normal').
+
+So we have four conditions: CD320 KO B12 deficient (-) diet. CD320 KO B12 normal (+) diet. CD320 Wildtype (WT) B12- diet. CD320 WT B12+ diet. RNA-seq was done on brain tissue from aged mice in these four conditions, in quadruplicate. 16 total samples. 
+
+## Goals for the project
+1. Did DB knockout CD320?
+2. What genes are differentially expressed between the conditions?
+
+## Technical notes
+1. Kallisto 0.42.4 with Gencode GRCm38 vM9 gtf generated counts for each annotated transcript
+2. tximport 1.0.3 was used to aggregate counts by gene (collapsed counts for trancripts by gene) and prep Kallisto counts for DESeq2
+3. DESeq2 1.3 was used to identify differentially expressed genes for several conditions (will be enumerated later)
+4. Code for this project is publically available here: https://github.com/davemcg/NF_B12
+
+## QC
+Before we get to the fun stuff, we need to QC the sequencing to make sure technical issues didn't pop up. 
+
+```{r, echo=FALSE,include=FALSE}
+source('03_qc_check.R')
+```
+
+First up is the heatmap, which shows how related each of the 48 sequencing reactions are. How did we get from 16 to 48? Well each of the 16 samples was split equally across three different sequencing lanes. First we want to make sure that the technical replicates are clustering together, based on the gene expression.
+
+```{r, echo=FALSE,fig.width=10}
+DESeq2Table <- DESeq(ddsG)
+rld <- rlogTransformation(DESeq2Table, blind=TRUE)
+colnames(rld) <- data.frame(colnames(rld)) %>% left_join(.,SampleTable,by=c("colnames.rld."="unique.ID")) %>% mutate(ID=paste(Genotype,Diet,lane.ID,sample.ID,sep='_')) %>% .[['ID']]
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix(sampleDists)
+library("RColorBrewer")
+library("pheatmap")
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+# looks crazy busy, because technical replicates are not collapsed together
+# demonstrates that, at least, the tech replicates are related
+# so it's safe to collpase them together
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)         
+```
+
+OK, so the technical replicates are very tight. Let's redo that plot, but merge the technical replicates together. 
+```{r}
+# collapse technical replicates and repeat heatmap
+ddsCollG <- collapseReplicates(ddsG, ddsG$sample.ID, ddsG$unique.ID)
+DESeq2Table <- DESeq(ddsCollG)
+rld <- rlogTransformation(DESeq2Table, blind=TRUE)
+colnames(rld) <- data.frame(colnames(rld)) %>% mutate(sample.ID=colnames.rld.) %>% right_join(.,SampleTable) %>% dplyr::select(sample.ID, Genotype, Diet) %>% distinct()  %>% mutate(ID=paste(Genotype,Diet,sample.ID,sep='_')) %>% .[['ID']]
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix(sampleDists)
+# not seeing any structure that matches biological knowldge (Genotype and/or Diet not grouping together)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)         
+```
+
+OK, so we are not seeing any structure that matches biological knowldge (Genotype and/or Diet not grouping together). Not necessarily expecting that, though. 
+
+Now we are going to do a t-SNE clustering approach to look for relatedness of samples and to check for outliers (sample-wise). log transformed counts (gene expression) are used for each sample. The technical replicates are collapsed together, so we have 16 data points. 
+
+```{r}
+# tsne clustering
+library(ggrepel)
+library(Rtsne)
+library(tidyr)
+tsne_out <- Rtsne(as.matrix(t(assay(rld))),perplexity = 5)
+tsne_plot <- data.frame(tsne_out$Y)
+tsne_plot$ID <- colnames(rld)
+tsne_plot %>% mutate(ID=gsub("B12_Deficient","B12Deficient",colnames(rld))) %>% separate(ID,c("Genotype","Diet","B12","Sample"),sep='_') %>% 
+  ggplot(.,aes(x=X1,y=X2,label=Sample,colour=Genotype,shape=Diet)) + 
+  geom_text_repel() + geom_point(size=3) + theme_bw() + xlab("") + ylab("") + ggtitle("t-sne Clustering")
+```
+
+OK, so we don't see any wacky outliers, nor do we see any overall trends where Genotype/Diet is splitting the samples. 
+
+Because t-SNE is a fairly new-fangled technique, we should also do a PCA. The downsides of the PCA is that you can't use the entire trancriptome data because the PCA doesn't handle that many dimensions very gracefully. It is typical to pick the most variable genes (1000 in the case) and do the PCA against those. 
+
+```{r}
+#PCA with 1000 most variable genes
+# something is...different about sample 7, we may want to remove it. Not certain. 
+# also, we see SOME difference in PC1 (26% of variance between genotypes)
+# I've checked PC3 and PC4 and not much interesting is happening there
+library(matrixStats)
+ntop = 1000
+Pvars <- rowVars(assay(rld))
+select <- order(Pvars, decreasing = TRUE)[seq_len(min(ntop, 
+                                                      length(Pvars)))]
+PCA <- prcomp(t(assay(rld)[select, ]), scale = F)
+percentVar <- round(100*PCA$sdev^2/sum(PCA$sdev^2),1)
+dataGG = data.frame(PC1 = PCA$x[,1], PC2 = PCA$x[,2], 
+                    PC3 = PCA$x[,3], PC4 = PCA$x[,4], 
+                    Diet = colData(rld)$Diet,
+                    Genotype = colData(rld)$Genotype,
+                    Samples=colData(rld)$sample.ID)
+
+ggplot(dataGG, aes(PC1, PC2, label=Samples, color=Genotype, shape=Diet)) +
+  geom_point(size=3) + geom_text_repel() +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + theme_bw()
+```
+
+Something is...different about sample 7, we may want to remove it. Not certain. Also, we see SOME difference in PC1 (26% of variance between genotypes) splitting the genotypes. I've checked PC3 and PC4 and not much interesting is happening there.
+
+## Differential Expression
+```{r, echo=FALSE,include=FALSE}
+source('04_DESeq2_analysis.R')
+```
+
+I've done four (that's right) different tests. All for the price of one. Why? I'm generous. Also, because not much significant is falling out of the tree, so I tried a few different ways of tree shaking (comparisons). 
+
+Test 1: CD320 KO vs CD320 WT
+- genotype only test, mashes together diet data
+Test 2: B12- diet vs B12+ diet
+- diet only test, mashes together genotypes
+Test 3: CD320 KO B12- vs CD320 WT vs B12- chow
+- smaller comparison; now just using the CD320 KO mice on B12- chow and comparing against CD320 WT mice also on the B12- chow
+Test 4: CD320 KO B12- vs CD320 WT vs B12+ chow
+- most extreme comparison;  CD320 KO mice on B12- chow and comparing against CD320 WT mice also on the B12+ chow
+
+First let's discuss the data in these tests (which will be given as an excel file)
+```{r}
+head(cd320.ko_vs_ctrl)
+```
+We see several columns: Gene, Source, Chr, Start, End, are self-explanatory (again, GRCm38 used)
+Then comes a series of less decipherable columns: baseMean, log2FoldChange, lfcSE, stat, pvalue, weight, padj
+I'll crib from http://www.bioconductor.org/help/workflows/rnaseqGene/#building-the-results-table to explain what each column is. If there are quotes, I'm copying. If not, they are my own words.
+
+"...baseMean... is a just the average of the normalized count values, dividing by size factors, taken over all samples in the DESeqDataSet."
+
+"log2FoldChange is the effect size estimate. It tells us how much the gene’s expression seems to have changed due to treatment with dexamethasone in comparison to untreated samples. This value is reported on a logarithmic scale to base 2: for example, a log2 fold change of 1.5 means that the gene’s expression is increased by a multiplicative factor of 2^1.5 = 2.82."
+
+log2FoldChangeUncorrected is a little tweak I added. The standard log2FoldChange is 'adjusted' to pull outlier count values back to the center. Which will dramatically reduce the log2FC value when you have a situation where 99% of the genes are largely the same, and a handful of genes are significantly different. Which is kind of what is happening here. So I've also provided the 'raw' log2FoldChange value.
+
+"lfcSE is the standard error estimate for the log2 fold change estimate"
+
+stat is the Wald test statistic for the comparison (different for each Test); like a t-test
+
+pvalue is the unadjusted significance of the Wald test
+
+"The weights are the inverse of the expected variance of log counts, so the inverse of 1/mu-bar + alpha-tr using the mean of normalized counts and the trended dispersion fit. The weighting ensures that noisy estimates of log fold changes from small count genes do not overly influence the calculation of the prior variance."
+
+padj is the IHW (bonferroni-like) multiple-test correct FDR
+
+OK, let's see the first five results (arranged by FDR) for Test 1: CD320 KO vs CD320 WT
+
+```{r}
+cd320.ko_vs_ctrl %>% arrange(pvalue) %>% head(5)
+```
+Hey, look Cd320! (also notice the dramatic difference in the log2FoldChange and log2FoldChangeUncorrected). 
+
+All of those columns with past "padj" are the RNA-seq counts, corrected by the size of the library.
+
+Now that we have a rough idea of what I'm delivering, I can give some summary statistics for the 4 tests and give some volcano plots to highlight interesting genes. 
+
+Test 1: CD320 KO vs CD320 WT
+1. Number of genes with FDR < 0.05
+```{r}
+nrow(cd320.ko_vs_ctrl %>% filter(padj<0.05))
+```
+2. Genes with a FDR < 0.05, sorted by pvalue
+```{r}
+cd320.ko_vs_ctrl %>% filter(padj<0.05) %>% arrange(pvalue) %>% .[['Gene']]
+```
+3. Number of genes with an FDR < 0.05 with a positive log2FoldChange (higher in WT)
+```{r}
+nrow(cd320.ko_vs_ctrl %>% filter(padj<0.05,log2FoldChange>0))
+```
+4. Number of genes with an FDR < 0.05 with a negative log2FoldChange (higher in KO)
+```{r}
+nrow(cd320.ko_vs_ctrl %>% filter(padj<0.05,log2FoldChange<0))
+```
+5. Volcano Plot
+```{r, fig.width=4,fig.height=3}
+volcano_plotter(cd320.ko_vs_ctrl,"CD320 KO vs CD320 WT")
+```
