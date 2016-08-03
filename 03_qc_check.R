@@ -1,4 +1,4 @@
-source('03_kallisto_to_DESeq2.R')
+source('02_kallisto_to_DESeq2.R')
 
 
 DESeq2Table <- DESeq(ddsG)
@@ -39,8 +39,8 @@ pheatmap(sampleDistMatrix,
          clustering_distance_cols=sampleDists,
          col=colors)         
 # collapse technical replicates and repeat heatmap
-ddsColl <- collapseReplicates(dds, dds$sample.ID, dds$unique.ID)
-DESeq2Table <- DESeq(ddsColl)
+ddsCollG <- collapseReplicates(ddsG, ddsG$sample.ID, ddsG$unique.ID)
+DESeq2Table <- DESeq(ddsCollG)
 rld <- rlogTransformation(DESeq2Table, blind=TRUE)
 colnames(rld) <- data.frame(colnames(rld)) %>% mutate(sample.ID=colnames.rld.) %>% right_join(.,SampleTable) %>% dplyr::select(sample.ID, Genotype, Diet) %>% distinct()  %>% mutate(ID=paste(Genotype,Diet,sample.ID,sep='_')) %>% .[['ID']]
 sampleDists <- dist(t(assay(rld)))
