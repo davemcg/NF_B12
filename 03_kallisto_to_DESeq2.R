@@ -12,10 +12,10 @@ library(readxl)
 # currently technical replicates are separate
 files <- paste(list.files(path='/Volumes/ThunderBay/PROJECTS/brody/NF_B12_mouse/kallisto', pattern=".*.*_kallisto", full.names=TRUE, include.dirs=TRUE, recursive=TRUE), '/abundance.tsv', sep='')
 
-# annotation info to jump from transcript to gene
-# kallisto quantifies on the transcript level, but it is much 
-# cleaner to work on the gene level, statistically and mentally
-# the mouse fasta file has the file info in it, so I can parse it
+# Annotation info to jump from transcript to gene.
+# Kallisto quantifies on the transcript level, but it is much 
+# cleaner to work on the gene level, statistically and mentally.
+# The mouse fasta file has the file info in it, so I can parse it
 # to grab the gene name
 anno <- fread(files[1]) # any file will work
 anno$Gene <- sapply(anno$target_id,function(x) strsplit(x,'\\|')[[1]][6])
