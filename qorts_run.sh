@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# v1.0.1
 sbatch --partition=quick --mem=20G /home/mcgaugheyd/bin/run_qorts.sh 160614_YOSHI_C90KTANXX.2.12581558.Aligned.sortedByCoord.out.bam /data/mcgaugheyd/genomes/GRCm38/gencode.vM8.primary_assembly.annotation.gtf
 sbatch --partition=quick --mem=20G /home/mcgaugheyd/bin/run_qorts.sh 160614_YOSHI_C90KTANXX.2.12581559.Aligned.sortedByCoord.out.bam /data/mcgaugheyd/genomes/GRCm38/gencode.vM8.primary_assembly.annotation.gtf
 sbatch --partition=quick --mem=20G /home/mcgaugheyd/bin/run_qorts.sh 160614_YOSHI_C90KTANXX.2.12581560.Aligned.sortedByCoord.out.bam /data/mcgaugheyd/genomes/GRCm38/gencode.vM8.primary_assembly.annotation.gtf
