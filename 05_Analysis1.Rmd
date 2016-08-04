@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 
 ## Introduction
-Mouse work done 97% by David Bernard. PI Lawrence Brody. CD320 (transcobamin receptr) knockout (KO) by DB, and subjected to a large set of experiments trying to suss out whether B12 transport has been affected. Since the full KO were largely healthy, DB gave the mice (and normal mice from the same background) special mouse chow that was B12 deficient and B12 positive ('normal').
+Mouse/bench work largely done by David Bernard under Lawrence Brody. CD320 (transcobamin receptor) knockout (KO) mouse line was created and subjected to a large set of experiments trying to suss out whether B12 transport has been affected. Since the full KO were largely healthy, the mice (and normal mice from the same background) were given one of two special mouse chows that are either B12 deficient or B12 positive ('normal').
 
 So we have four conditions: CD320 KO B12 deficient (-) diet. CD320 KO B12 normal (+) diet. CD320 Wildtype (WT) B12- diet. CD320 WT B12+ diet. RNA-seq was done on brain tissue from aged mice in these four conditions, in quadruplicate. 16 total samples. 
 
@@ -31,13 +31,13 @@ So we have four conditions: CD320 KO B12 deficient (-) diet. CD320 KO B12 normal
 ## QC
 Before we get to the fun stuff, we need to QC the sequencing to make sure technical issues didn't pop up. 
 
-```{r, echo=FALSE,include=FALSE}
+```{r, echo=FALSE,include=FALSE, cache=TRUE}
 source('03_qc_check.R')
 ```
 
 First up is the heatmap, which shows how related each of the 48 sequencing reactions are. How did we get from 16 to 48? Well each of the 16 samples was split equally across three different sequencing lanes. First we want to make sure that the technical replicates are clustering together, based on the gene expression.
 
-```{r, echo=FALSE,fig.width=10}
+```{r, echo=FALSE, include=FALSE, cache=TRUE}
 DESeq2Table <- DESeq(ddsG)
 rld <- rlogTransformation(DESeq2Table, blind=TRUE)
 colnames(rld) <- data.frame(colnames(rld)) %>% left_join(.,SampleTable,by=c("colnames.rld."="unique.ID")) %>% mutate(ID=paste(Genotype,Diet,lane.ID,sample.ID,sep='_')) %>% .[['ID']]
@@ -46,6 +46,9 @@ sampleDistMatrix <- as.matrix(sampleDists)
 library("RColorBrewer")
 library("pheatmap")
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+```
+
+```{r,echo=FALSE, fig.width=10,fig.height=8, cache=TRUE}
 # looks crazy busy, because technical replicates are not collapsed together
 # demonstrates that, at least, the tech replicates are related
 # so it's safe to collpase them together
@@ -56,7 +59,7 @@ pheatmap(sampleDistMatrix,
 ```
 
 OK, so the technical replicates are very tight. Let's redo that plot, but merge the technical replicates together. 
-```{r}
+```{r, echo=FALSE, include=FALSE, cache=TRUE}
 # collapse technical replicates and repeat heatmap
 ddsCollG <- collapseReplicates(ddsG, ddsG$sample.ID, ddsG$unique.ID)
 DESeq2Table <- DESeq(ddsCollG)
@@ -64,6 +67,9 @@ rld <- rlogTransformation(DESeq2Table, blind=TRUE)
 colnames(rld) <- data.frame(colnames(rld)) %>% mutate(sample.ID=colnames.rld.) %>% right_join(.,SampleTable) %>% dplyr::select(sample.ID, Genotype, Diet) %>% distinct()  %>% mutate(ID=paste(Genotype,Diet,sample.ID,sep='_')) %>% .[['ID']]
 sampleDists <- dist(t(assay(rld)))
 sampleDistMatrix <- as.matrix(sampleDists)
+```
+
+```{r, echo=FALSE, fig.width=10,fig.height=8, cache=TRUE}
 # not seeing any structure that matches biological knowldge (Genotype and/or Diet not grouping together)
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
@@ -75,7 +81,7 @@ OK, so we are not seeing any structure that matches biological knowldge (Genotyp
 
 Now we are going to do a t-SNE clustering approach to look for relatedness of samples and to check for outliers (sample-wise). log transformed counts (gene expression) are used for each sample. The technical replicates are collapsed together, so we have 16 data points. 
 
-```{r}
+```{r, cache=TRUE}
 # tsne clustering
 library(ggrepel)
 library(Rtsne)
@@ -92,7 +98,7 @@ OK, so we don't see any wacky outliers, nor do we see any overall trends where G
 
 Because t-SNE is a fairly new-fangled technique, we should also do a PCA. The downsides of the PCA is that you can't use the entire trancriptome data because the PCA doesn't handle that many dimensions very gracefully. It is typical to pick the most variable genes (1000 in the case) and do the PCA against those. 
 
-```{r}
+```{r, cache=TRUE}
 #PCA with 1000 most variable genes
 # something is...different about sample 7, we may want to remove it. Not certain. 
 # also, we see SOME difference in PC1 (26% of variance between genotypes)
@@ -118,21 +124,21 @@ ggplot(dataGG, aes(PC1, PC2, label=Samples, color=Genotype, shape=Diet)) +
 
 Something is...different about sample 7, we may want to remove it. Not certain. Also, we see SOME difference in PC1 (26% of variance between genotypes) splitting the genotypes. I've checked PC3 and PC4 and not much interesting is happening there.
 
-## Differential Expression
-```{r, echo=FALSE,include=FALSE}
+## Differential Gene Expression 
+```{r, echo=FALSE,include=FALSE, cache=TRUE}
 source('04_DESeq2_analysis.R')
 ```
 
 I've done four (that's right) different tests. All for the price of one. Why? I'm generous. Also, because not much significant is falling out of the tree, so I tried a few different ways of tree shaking (comparisons). 
 
 Test 1: CD320 KO vs CD320 WT
-- genotype only test, mashes together diet data
+    - genotype only test, mashes together diet data
 Test 2: B12- diet vs B12+ diet
-- diet only test, mashes together genotypes
+    - diet only test, mashes together genotypes
 Test 3: CD320 KO B12- vs CD320 WT vs B12- chow
-- smaller comparison; now just using the CD320 KO mice on B12- chow and comparing against CD320 WT mice also on the B12- chow
+    - smaller comparison; now just using the CD320 KO mice on B12- chow and comparing against CD320 WT mice also on the B12- chow
 Test 4: CD320 KO B12- vs CD320 WT vs B12+ chow
-- most extreme comparison;  CD320 KO mice on B12- chow and comparing against CD320 WT mice also on the B12+ chow
+    - most extreme comparison;  CD320 KO mice on B12- chow and comparing against CD320 WT mice also on the B12+ chow
 
 First let's discuss the data in these tests (which will be given as an excel file)
 ```{r}
@@ -160,7 +166,7 @@ padj is the IHW (bonferroni-like) multiple-test correct FDR
 
 OK, let's see the first five results (arranged by FDR) for Test 1: CD320 KO vs CD320 WT
 
-```{r}
+```{r, cache=TRUE}
 cd320.ko_vs_ctrl %>% arrange(pvalue) %>% head(5)
 ```
 Hey, look Cd320! (also notice the dramatic difference in the log2FoldChange and log2FoldChangeUncorrected). 
@@ -187,6 +193,82 @@ nrow(cd320.ko_vs_ctrl %>% filter(padj<0.05,log2FoldChange>0))
 nrow(cd320.ko_vs_ctrl %>% filter(padj<0.05,log2FoldChange<0))
 ```
 5. Volcano Plot
-```{r, fig.width=4,fig.height=3}
+```{r, fig.width=10,fig.height=8}
 volcano_plotter(cd320.ko_vs_ctrl,"CD320 KO vs CD320 WT")
 ```
+
+Test 2: B12- diet vs B12+ diet
+1. Number of genes with FDR < 0.05
+```{r}
+nrow(B12neg_vs_B12pos%>% filter(padj<0.05))
+```
+2. Genes with a FDR < 0.05, sorted by pvalue
+```{r}
+B12neg_vs_B12pos %>% filter(padj<0.05) %>% arrange(pvalue) %>% .[['Gene']]
+```
+3. Number of genes with an FDR < 0.05 with a positive log2FoldChange (higher in B12+)
+```{r}
+nrow(B12neg_vs_B12pos %>% filter(padj<0.05,log2FoldChange>0))
+```
+4. Number of genes with an FDR < 0.05 with a negative log2FoldChange (higher in B12-)
+```{r}
+nrow(B12neg_vs_B12pos %>% filter(padj<0.05,log2FoldChange<0))
+```
+5. Volcano Plot
+```{r, fig.width=10,fig.height=8}
+volcano_plotter(B12neg_vs_B12pos,"B12- Diet vs B12+ Diet")
+```
+
+Test 3: CD320 KO B12- vs CD320 WT vs B12- chow
+1. Number of genes with FDR < 0.05
+```{r}
+nrow(cd320.koB12neg_vs_ctrlB12neg %>% filter(padj<0.05))
+```
+2. Genes with a FDR < 0.05, sorted by pvalue
+```{r}
+cd320.koB12neg_vs_ctrlB12neg %>% filter(padj<0.05) %>% arrange(pvalue) %>% .[['Gene']]
+```
+3. Number of genes with an FDR < 0.05 with a positive log2FoldChange (higher in CD320 WT B12-)
+```{r}
+nrow(cd320.koB12neg_vs_ctrlB12neg %>% filter(padj<0.05,log2FoldChange>0))
+```
+4. Number of genes with an FDR < 0.05 with a negative log2FoldChange (higher in CD320 KO B12-)
+```{r}
+nrow(cd320.koB12neg_vs_ctrlB12neg %>% filter(padj<0.05,log2FoldChange<0))
+```
+5. Volcano Plot
+```{r, fig.width=10,fig.height=8}
+volcano_plotter(cd320.koB12neg_vs_ctrlB12neg,"CD320 KO B12- vs CD320 WT B12-")
+```
+
+Test 4: CD320 KO B12- vs CD320 WT vs B12+ chow
+1. Number of genes with FDR < 0.05
+```{r}
+nrow(cd320.koB12neg_vs_ctrlB12pos%>% filter(padj<0.05))
+```
+2. Genes with a FDR < 0.05, sorted by pvalue
+```{r}
+cd320.koB12neg_vs_ctrlB12pos %>% filter(padj<0.05) %>% arrange(pvalue) %>% .[['Gene']]
+```
+3. Number of genes with an FDR < 0.05 with a positive log2FoldChange (higher in CD320 WT B12+)
+```{r}
+nrow(cd320.koB12neg_vs_ctrlB12pos %>% filter(padj<0.05,log2FoldChange>0))
+```
+4. Number of genes with an FDR < 0.05 with a negative log2FoldChange (higher in B12-)
+```{r}
+nrow(cd320.koB12neg_vs_ctrlB12pos %>% filter(padj<0.05,log2FoldChange<0))
+```
+5. Volcano Plot
+```{r, fig.width=10,fig.height=8}
+volcano_plotter(cd320.koB12neg_vs_ctrlB12pos,"CD320 KO B12- vs CD320 WT B12+")
+```
+
+## Conclusion
+
+Gene expression is largely the same between all conditions. With the exception of Cd320 (and Efhb, perhaps), there are no dramatically differentially expressed genes. There are dozens to hundreds of significantly differentially expressed genes. 
+
+Let me know what you want to try next. I can look for differential exon usage or differential transcript usage. Or if you want different conditions tested besides the four I've presented. 
+
+David
+
+2016-08-04
